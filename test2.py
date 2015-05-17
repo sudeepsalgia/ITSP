@@ -41,7 +41,7 @@ def my_thresh(img, res, error):
 cap = cv2.VideoCapture(1)
 res1, res2, res3, res4, res5, res6 = [], [], [], [], [], []
 sd1, sd2, sd3, sd4, sd5, sd6 =[], [], [], [], [], []
-
+hull = []
 while (1):
     _, img1=cap.read()
 
@@ -131,8 +131,11 @@ while 1:
     contour = cv2.drawContours(im, contours, pos, (0, 0, 255), 3)
 
     cv2.drawContours(im, cv2.convexHull(contours[pos], True, False), -1, (255, 0, 0), 3)
-
-    #print len(cv2.convexHull(contours[0], True, False))
+    hull = cv2.convexHull(contours[pos], True, True)
+    pts = np.array(hull, np.int32)
+    pts = pts.reshape((-1,1,2))
+    img = cv2.polylines(im,[pts],True,(255, 0, 0))
+    
 
     cv2.imshow("blur", blur)
     cv2.imshow("dilate", dilated)
@@ -141,6 +144,4 @@ while 1:
     k=cv2.waitKey(5)
     if k==27:
         break
-
-
 cv2.destroyAllWindows()
