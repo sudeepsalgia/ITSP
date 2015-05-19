@@ -38,6 +38,9 @@ def my_thresh(img, res, error):
     upperb = np.array([res[0]+error[0]*factor, res[1]+error[1]*factor, res[2]+error[2]*factor])
     return cv2.inRange(img, lowerb, upperb)
 
+def distance(point1, point2):
+    return sqrt((point1[0]-point2[0])**2 + (point1[1]-point2[1])**2)
+
 cap = cv2.VideoCapture(1)
 res1, res2, res3, res4, res5, res6 = [], [], [], [], [], []
 sd1, sd2, sd3, sd4, sd5, sd6 =[], [], [], [], [], []
@@ -116,7 +119,7 @@ while 1:
     dilated = cv2.dilate(blur, kernel)
 
     contours, hierarchy = cv2.findContours(blur.copy(),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    contour = cv2.drawContours(im, contours, -1, (0,255,0), 3)
+
 
 
     maxarea = 0
@@ -131,22 +134,38 @@ while 1:
     cnt = contours[pos]
     cv2.drawContours(im, cv2.convexHull(cnt, True, True), -1, (255, 0, 0), 3)
     hull = cv2.convexHull(cnt, returnPoints=False)
-    hull1 = hull.copy()
+    hull1 = cv2.convexHull(cnt, returnPoints=True)
 
-    defects = cv2.convexityDefects(cnt, hull1)
+    M = cv2.moments(cnt)
+    cx = int(M['m10']/M['m00'])
+    cy = int(M['m01']/M['m00'])
+    radius = 0
+    for i in range(len(cnt)):
+        radius +=  distane((cx, cy), cnt[i][0])
+
+    radius /= len(cnt)
+
+    cv2.circle(im, (cx, cy), int(radius), [255, 255, 255], 1)
+
+
+
+    pts = np.array(hull1, np.int32)
+    pts = pts.reshape((-1,1,2))
+    img = cv2.polylines(im, [pts], True, (255, 0, 0))
+    poly = cv2.approxPolyDP(pts, 20, True)
+
+    for i in range(len(poly)):
+        cv2.circle(im, tuple(poly[i][0]), 10, [255, 0, 255], 1)
+        cv2.line(im, (cx, cy), tuple(poly[i][0]), [0,0,0], 2 )
+
+    cv2.drawContours(im, poly, -1, (0, 0, 0), 3)
+
+    defects = cv2.convexityDefects(cnt, hull)
     for i in range(defects.shape[0]):
-        s,e,f,d = defects[i,0]
-        start = tuple(cnt[s][0])
-        end = tuple(cnt[e][0])
+        s, e, f, d = defects[i, 0]
         far = tuple(cnt[f][0])
-        cv2.line(im, start, end, [255, 0, 0], 2)
         cv2.circle(im, far, 20, [255, 255, 0], 1)
 
-    # pts = np.array(hull2, np.int32)
-    # pts1 = pts.reshape((-1,1,2))
-    # img = cv2.polylines(im, [pts1], True, (255, 0, 0))
-    # poly = cv2.approxPolyDP(pts1, 20, True)
-    #cv2.drawContours(im, poly, -1, (0, 0, 0), 3)
     cv2.imshow("blur", blur)
     cv2.imshow("dilate", dilated)
     cv2.imshow("im", im)
