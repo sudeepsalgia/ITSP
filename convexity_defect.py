@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from math import sqrt
-def distane(point1, point2):
+def distance(point1, point2):
     return sqrt((point1[0]-point2[0])**2+(point1[1]-point2[1])**2)
 def thresh_det(x1,y1,x2,y2,img):
     averageB = 0
@@ -40,6 +40,14 @@ def my_thresh(img, res, error):
 
 def distance(point1, point2):
     return sqrt((point1[0]-point2[0])**2 + (point1[1]-point2[1])**2)
+
+def find_fingers(centre, radius, poly_points):
+    error_margin = radius*0.25
+    finger_points = []
+    for i in range(len(poly_points)):
+        if distance(centre, poly_points[i][0]) > radius+error_margin:
+            finger_points.append(poly_points[i][0])
+    return finger_points
 
 cap = cv2.VideoCapture(1)
 res1, res2, res3, res4, res5, res6 = [], [], [], [], [], []
@@ -120,8 +128,6 @@ while 1:
 
     contours, hierarchy = cv2.findContours(blur.copy(),cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
-
-
     maxarea = 0
     pos = -1
     for i in range(len(contours)):
@@ -141,13 +147,9 @@ while 1:
     cy = int(M['m01']/M['m00'])
     radius = 0
     for i in range(len(cnt)):
-        radius +=  distane((cx, cy), cnt[i][0])
+        radius += distance((cx, cy), cnt[i][0])
 
     radius /= len(cnt)
-
-    cv2.circle(im, (cx, cy), int(radius), [255, 255, 255], 1)
-
-
 
     pts = np.array(hull1, np.int32)
     pts = pts.reshape((-1,1,2))
@@ -160,11 +162,38 @@ while 1:
 
     cv2.drawContours(im, poly, -1, (0, 0, 0), 3)
 
+    validPoints=[]
     defects = cv2.convexityDefects(cnt, hull)
     for i in range(defects.shape[0]):
         s, e, f, d = defects[i, 0]
         far = tuple(cnt[f][0])
         cv2.circle(im, far, 20, [255, 255, 0], 1)
+        dis = distance(far, (cx,cy)) 
+        if dis < 1.25*radius:
+            validPoints.append(far)
+
+    cxNew = 0
+    cyNew = 0
+    for point in validPoints:
+        cxNew += point[0]
+        cyNew += point[1]
+
+    cxNew /= len(validPoints)
+    cyNew /= len(validPoints)
+
+    radiusNew = 0
+    for point in validPoints:
+        radiusNew += distance((cxNew, cyNew), point)
+
+    radiusNew /= len(validPoints)
+
+    cv2.circle(im, (cx, cy), int(radiusNew), [255, 255, 255], 1)
+    cv2.circle(im, (cxNew, cyNew), int(radiusNew), [0, 0, 0], 5)
+
+    numberOfCircles = len(find_fingers((cxNew, cyNew), radiusNew, poly))
+    print numberOfCircles
+    for point in find_fingers((cxNew, cyNew), radiusNew, poly):
+        cv2.circle(im, tuple(point), 10, [0, 255, 0], -1)
 
     cv2.imshow("blur", blur)
     cv2.imshow("dilate", dilated)
