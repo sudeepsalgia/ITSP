@@ -22,7 +22,7 @@ letters = [chr(i) for i in range(65, 90) if i != 74]
 for x in range(10):
     letters.append(str(x))
 for l in letters:
-    imageName = "ITSP_templates/" + l + ".png"
+    imageName = "ITSP_templates3/" + l + ".png"
     print imageName
     image = cv2.imread(imageName, 0)
     store_contour(image, l)

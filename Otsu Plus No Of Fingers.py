@@ -1,13 +1,22 @@
-__author__ = 'Ritwick'
 import cv2
 import numpy as np
 import time
 from math import sqrt
+import contour_compare
+import load_images
+
+cv2.namedWindow("result", 500*500)
+images = {}
+print "loading images"
+load_images.load_display_images(images)
+print "images loaded"
 
 
 def distance(point1, point2):
     return sqrt((point1[0]-point2[0])**2+(point1[1]-point2[1])**2)
-def thresh_det(x1,y1,x2,y2,img):
+
+
+def thresh_det(x1, y1, x2, y2, img):
     averageB = 0
     averageG = 0
     averageR = 0
@@ -16,13 +25,13 @@ def thresh_det(x1,y1,x2,y2,img):
     sumR = 0
     for i in range(x1, x2):
         for j in range(y1, y2):
-            sumB+=img[i, j, 0]
-            sumG+=img[i, j, 1]
-            sumR+=img[i, j, 2]
+            sumB += img[i, j, 0]
+            sumG += img[i, j, 1]
+            sumR += img[i, j, 2]
     averageB = sumB/400
     averageG = sumG/400
     averageR = sumR/400
-    varB , varG, varR = 0,0,0
+    varB, varG, varR = 0, 0,  0
     for i in range(x1, x2):
         for j in range(y1, y2):
             varB += (averageB - img[i,j,0])**2
@@ -32,9 +41,10 @@ def thresh_det(x1,y1,x2,y2,img):
     sdG = int(sqrt(varG/400))
     sdR = int(sqrt(varR/400))
     factor = 1
-    lowerb= np.array([averageB-sdB*factor, averageG-sdG*factor, averageR-sdR*factor])
-    upperb= np.array([averageB+sdB*factor, averageG+sdG*factor, averageR+sdR*factor])
+    lowerb = np.array([averageB-sdB*factor, averageG-sdG*factor, averageR-sdR*factor])
+    upperb = np.array([averageB+sdB*factor, averageG+sdG*factor, averageR+sdR*factor])
     return [cv2.inRange(img,lowerb,upperb), averageB, averageG, averageR, [sdB, sdG, sdR]]
+
 
 def my_thresh(img, res, error):
     factor = 1
@@ -42,24 +52,26 @@ def my_thresh(img, res, error):
     upperb = np.array([res[0]+error[0]*factor, res[1]+error[1]*factor, res[2]+error[2]*factor])
     return cv2.inRange(img, lowerb, upperb)
 
+
 def distance(point1, point2):
     return sqrt((point1[0]-point2[0])**2 + (point1[1]-point2[1])**2)
 
+
 def find_fingers(centre, radius, poly_points):
-    error_margin = radius*0.3
+    error_margin = radius*0.25
     finger_points = []
     for i in range(len(poly_points)):
         if distance(centre, poly_points[i][0]) > radius+error_margin:
             finger_points.append(poly_points[i][0])
     return finger_points
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 start_time = time.time()
 frequency_of_finger = [0, 0, 0, 0, 0, 0]
 
 while 1:
     _, im = cap.read()
-    img=im
+    img = im
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     ret2, th2 = cv2.threshold(img,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
@@ -83,8 +95,8 @@ while 1:
     cnt = contours[pos]
     cv2.drawContours(im, cv2.convexHull(cnt, True, True), -1, (255, 0, 0), 3)
 
-    x,  y, w, h = cv2.boundingRect(contours[pos])
-    cv2.rectangle(im, (x, y), (x+w, y+h), (0, 255, 0), 2)
+    # x,  y, w, h = cv2.boundingRect(contours[pos])
+    # cv2.rectangle(im, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
     hull = cv2.convexHull(cnt, returnPoints=False)
     hull1 = cv2.convexHull(cnt, returnPoints=True)
@@ -109,7 +121,7 @@ while 1:
 
     cv2.drawContours(im, poly, -1, (0, 0, 0), 3)
 
-    validPoints=[]
+    validPoints = []
     defects = cv2.convexityDefects(cnt, hull)
     for i in range(defects.shape[0]):
         s, e, f, d = defects[i, 0]
@@ -118,6 +130,7 @@ while 1:
         dis = distance(far, (cx,cy))
         if dis < 1.25*radius:
             validPoints.append(far)
+            cv2.circle(im, far, 20, [255, 255, 0], 1)
 
     cxNew = 0
     cyNew = 0
@@ -125,17 +138,18 @@ while 1:
         cxNew += point[0]
         cyNew += point[1]
 
-    cxNew /= len(validPoints)
-    cyNew /= len(validPoints)
+    if len(validPoints)>0:
+        cxNew /= len(validPoints)
+        cyNew /= len(validPoints)
 
     radiusNew = 0
     for point in validPoints:
         radiusNew += distance((cxNew, cyNew), point)
-
-    radiusNew /= len(validPoints)
+    if len(validPoints):
+        radiusNew /= len(validPoints)
 
     # cv2.circle(im, (cx, cy), int(radiusNew), [255, 255, 255], 1)
-    # cv2.circle(im, (cxNew, cyNew), int(radiusNew), [0, 0, 0], 5)
+    cv2.circle(im, (cxNew, cyNew), int(radiusNew), [255, 255, 255], 1)
 
     pointOfFingers = find_fingers((cxNew, cyNew), radiusNew, poly)
 
@@ -143,8 +157,6 @@ while 1:
     if time.time() - start_time > 1.5:
         maximum = max(frequency_of_finger)
         l = [i for i, j in enumerate(frequency_of_finger) if j == maximum]
-        print l
-        #print frequency_of_finger
         frequency_of_finger = [0, 0, 0, 0, 0, 0]
         start_time = time.time()
     else:
@@ -154,12 +166,19 @@ while 1:
     for point in pointOfFingers:
         cv2.circle(im, tuple(point), 10, [0, 255, 0], -1)
 
-    cv2.imshow("blur", blur)
+
+    print numberOfFingers,
+    contour_compare.find_letter(cnt)
+    contour_compare.contour_compare_using_group(cnt, numberOfFingers-2, images)
+
+    x,  y, w, h = cv2.boundingRect(contours[pos])
+    cv2.rectangle(im, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
     cv2.imshow("dilate", dilated)
     cv2.imshow("im", im)
 
-    k=cv2.waitKey(5)
-    if k==27:
+    k = cv2.waitKey(5)
+    if k == 27:
         break
 cv2.destroyAllWindows()
 
